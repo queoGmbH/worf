@@ -1,6 +1,6 @@
 # Cookie Parser helper
 
-This project ...
+This project can store Cookies from external Websites in a yaml file.
 
 ## Requirements
 
