@@ -1,0 +1,14 @@
+{
+  "name": "cookieconsent",
+  "version": "1.0.0",
+  "description": "Accumulates cookie data of a given website.",
+  "main": "cc.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Lucas Börner",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^2.0.0"
+  }
+}
