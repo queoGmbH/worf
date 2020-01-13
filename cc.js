@@ -1,7 +1,9 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const yaml = require('js-yaml');
+const filename = "data-out"
 const url = process.argv[2];
+let data = [];
 
 (async () => {
 
@@ -13,23 +15,41 @@ const url = process.argv[2];
 
 		try {
 
+			let urls = [];
+			urls[0] = url;
 
-			// get cookies
-			let data = await page._client.send('Network.getAllCookies');
-			data = data.cookies.map(cookie => {
-				cookie.expiresUTC = new Date(cookie.expires * 1000);
-				return cookie;
-			});
+
+
+			for (let i = 0; i < urls.length; i++) {
+				await page.goto(urls[i], {waitUntil: 'networkidle2'});
+				console.log(urls[i]);
+
+				// get cookies
+				data[i] = await page._client.send('Network.getAllCookies');
+				data[i] = data[i].cookies.map(cookie => {
+					cookie.expiresUTC = new Date(cookie.expires * 1000);
+					return cookie;
+				});
+
+			}
+
 
 			// write yaml file
-			if (data.length > 0) {
-				let yamlStr = yaml.safeDump(data);
-                fs.writeFileSync('./data-out.yaml', yamlStr, 'utf-8');
+			if (data.length > 0 && data[0].length > 0) {
+				let cookies;
+				for (let i = 0; i < data.length; i++) {
+					cookies = data[i];
+				}
 
-				console.log("cookies found: " + data.length + "\n" + "yaml file save to: " + __dirname + "/data-out.yaml");
+				let yamlStr = yaml.safeDump(cookies);
+				fs.writeFileSync('./' + filename + '.yaml', yamlStr, 'utf-8');
+
+				console.log("cookies found: " + cookies.length + "\n" + "yaml file save to: " + __dirname + "/" + filename + ".yaml");
 			} else {
 				console.log("no cookies found at the given url");
 			}
+
+
 
 
 		} catch (error) {
