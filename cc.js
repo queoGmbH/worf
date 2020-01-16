@@ -32,8 +32,6 @@ let startUrls = [];
 
 			if(depth == null) depth = 0;
 
-			console.log(page.url());
-
 			startUrls.push(await getUrls());
 
 			await loopOverUrls(startUrls);
@@ -64,9 +62,9 @@ async function loopOverUrls(givenUrls) {
 
 	} else if (currentDepth <= depth) {
 
-		console.log("go to urls at depth: " + currentDepth);
-
 		if (givenUrls != null) {
+
+			console.log("Visit Urls at Depth: " + currentDepth);
 
 			for (let i = 0; i < givenUrls.length; i++) {
 
@@ -148,7 +146,9 @@ async function writeFile() {
 
 	if (cookies.length > 0) {
 		let yamlStr = yaml.safeDump(cookies);
+
 		const filePath = path.join(__dirname, filename + '.yaml');
+
 		await fs.writeFile(filePath, yamlStr, 'utf-8');
 
 		console.log("cookies found: " + cookies.length + "\n" + "yaml file save to: " + filePath);
