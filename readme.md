@@ -17,7 +17,7 @@ npm install
 To run the script, type this in your console:
 
 ```shell
-node cc.js <URL>
+node cc.js <URL> <depth>
 ```
 
 The output will contain the yaml file path all the cookie info has been written to.
