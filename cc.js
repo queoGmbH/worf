@@ -54,6 +54,7 @@ let startUrls = [];
 
 })();
 
+// loop over the given Urls and collect the urls form that
 async function loopOverUrls(givenUrls) {
 
 	if (currentDepth > depth) {
@@ -64,7 +65,7 @@ async function loopOverUrls(givenUrls) {
 
 		if (givenUrls != null) {
 
-			console.log("Visit Urls at Depth: " + currentDepth);
+			console.log("\nVisit Urls at Depth: " + currentDepth);
 
 			for (let i = 0; i < givenUrls.length; i++) {
 
@@ -104,7 +105,8 @@ async function getUrls() {
 
 		result = hrefs.filter(item => item.startsWith(slicedUrl[0] + '//www.' + slicedUrl[2]));
 
-		result = result.filter(item => !item.endsWith(".pdf"));
+		result = result.filter(item => item.substr(item.length - 4, 1) !== ".");
+
 
 		for (let i = 0; i < result.length; i++) {
 			result[i] = result[i].split('#')[0];
@@ -151,7 +153,7 @@ async function writeFile() {
 
 		await fs.writeFile(filePath, yamlStr, 'utf-8');
 
-		console.log("cookies found: " + cookies.length + "\n" + "yaml file save to: " + filePath);
+		console.log("\nCookies found: " + cookies.length + "\n" + "Yaml file save to: " + filePath);
 
 	} else {
 
