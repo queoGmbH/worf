@@ -74,8 +74,6 @@ async function loopOverUrls(givenUrls) {
 
 		if (givenUrls != null) {
 
-			console.log("\nVisit Urls at Depth: " + currentDepth);
-
 			for (let i = 0; i < givenUrls.length; i++) {
 
 				for (let j = 0; j < givenUrls[i].length; j++) {
