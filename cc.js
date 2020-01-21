@@ -4,7 +4,8 @@ const path = require('path');
 const yaml = require('js-yaml');
 const filename = "data-out";
 const url = process.argv[2];
-let depth = process.argv[3]; //? undefined: 0;
+let depth = process.argv[3];
+const mode = process.argv[4];
 
 let browser;
 let page;
@@ -24,37 +25,45 @@ let startUrls = [];
 
 	if (url != null) {
 
-		browser = await puppeteer.launch();
-		page = await browser.newPage();
-		await page.goto(url, {waitUntil: 'networkidle2'});
+		if(!isNaN(depth)) {
 
-		try {
+			try {
 
-			if(depth == null) depth = 0;
+				browser = await puppeteer.launch();
+				page = await browser.newPage();
+				await page.goto(url, {waitUntil: 'networkidle2'});
 
-			startUrls.push(await getUrls());
+				if(depth == null) depth = 0;
 
-			await loopOverUrls(startUrls);
+				startUrls.push(await getUrls());
 
-		} catch (error) {
+				await loopOverUrls(startUrls);
 
-			console.log(error);
+			} catch (error) {
 
-		} finally {
+				console.log(error);
 
-			await browser.close();
+			} finally {
+
+				await browser.close();
+
+			}
+
+		} else {
+
+			console.log('No Depth is given');
 
 		}
 
 	} else {
 
-		console.log("no url set");
+		console.log("No Url is given");
 
 	}
 
 })();
 
-// loop over the given Urls and collect the urls form that
+
 async function loopOverUrls(givenUrls) {
 
 	if (currentDepth > depth) {
@@ -73,11 +82,15 @@ async function loopOverUrls(givenUrls) {
 
 					if (visited.indexOf(givenUrls[i][j]) === -1) {
 
-						await page.goto(givenUrls[i][j], {waitUntil: 'networkidle2'});
+						if(mode === "fast") {
+							await page.goto(givenUrls[i][j]);
+						} else {
+							await page.goto(givenUrls[i][j], {waitUntil: 'networkidle2'});
+						}
 
 						console.log(page.url());
 
-						urls.push(await getUrls());
+						if(currentDepth < depth) urls.push(await getUrls());
 
 						visited.push(page.url());
 
@@ -96,7 +109,7 @@ async function loopOverUrls(givenUrls) {
 	}
 }
 
-//get all urls from current page
+
 async function getUrls() {
 
 	try {
@@ -106,7 +119,6 @@ async function getUrls() {
 		result = hrefs.filter(item => item.startsWith(slicedUrl[0] + '//www.' + slicedUrl[2]));
 
 		result = result.filter(item => item.substr(item.length - 4, 1) !== ".");
-
 
 		for (let i = 0; i < result.length; i++) {
 			result[i] = result[i].split('#')[0];
@@ -127,7 +139,7 @@ async function getUrls() {
 	}
 }
 
-// get all cookies form the given url
+
 async function getCookies() {
 
 	const response = await page._client.send('Network.getAllCookies');
@@ -143,7 +155,6 @@ async function getCookies() {
 }
 
 
-// write all collected cookies to yaml file
 async function writeFile() {
 
 	if (cookies.length > 0) {
