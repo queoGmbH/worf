@@ -35,7 +35,9 @@ let startUrls = [];
 
 				if(depth == null) depth = 0;
 
-				await loopOverUrls([[url]]);
+				startUrls.push(await getUrls());
+
+				await loopOverUrls(startUrls);
 
 			} catch (error) {
 
