@@ -144,6 +144,10 @@ async function getCookies() {
 
 	const currentCookies = response.cookies.map(cookie => {
 		cookie.expiresUTC = new Date(cookie.expires * 1000);
+
+		let timeDiff = Math.abs(new Date(Date.now()).getTime() - new Date(cookie.expires * 1000).getTime());
+		cookie.currentDaysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
 		return cookie;
 	});
 

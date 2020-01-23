@@ -9,6 +9,7 @@
   "author": "Lucas Börner",
   "license": "MIT",
   "dependencies": {
+    "js-yaml": "^3.13.1",
     "puppeteer": "^2.0.0"
   }
 }
