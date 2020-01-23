@@ -25,7 +25,7 @@ let startUrls = [];
 
 	if (url != null) {
 
-		if(!isNaN(depth)) {
+		if(!isNaN(depth) || depth == null) {
 
 			try {
 
@@ -35,9 +35,7 @@ let startUrls = [];
 
 				if(depth == null) depth = 0;
 
-				startUrls.push(await getUrls());
-
-				await loopOverUrls(startUrls);
+				await loopOverUrls([[url]]);
 
 			} catch (error) {
 
