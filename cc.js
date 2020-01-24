@@ -10,34 +10,26 @@ const mode = process.argv[4];
 let browser;
 let page;
 
-let currentDepth = 1;
+let currentDepth = 0;
 let slicedUrl = url.split('/');
-
-let cookies = [];
-let result = [];
 let visited = [];
 let urls = [];
-let startUrls = [];
-
 
 
 (async () => {
 
 	if (url != null) {
 
-		if(!isNaN(depth) || depth == null) {
+		if (!isNaN(depth) || depth == null) {
 
 			try {
 
 				browser = await puppeteer.launch();
 				page = await browser.newPage();
-				await page.goto(url, {waitUntil: 'networkidle2'});
 
-				if(depth == null) depth = 0;
+				if (depth == null) depth = 0;
 
-				startUrls.push(await getUrls());
-
-				await loopOverUrls(startUrls);
+				await loopOverUrls([[url]]);
 
 			} catch (error) {
 
@@ -72,6 +64,8 @@ async function loopOverUrls(givenUrls) {
 
 	} else if (currentDepth <= depth) {
 
+		console.log('Search for Urls at depth: ' + currentDepth);
+
 		if (givenUrls != null) {
 
 			for (let i = 0; i < givenUrls.length; i++) {
@@ -80,15 +74,15 @@ async function loopOverUrls(givenUrls) {
 
 					if (visited.indexOf(givenUrls[i][j]) === -1) {
 
-						if(mode === "fast") {
+						if (mode === "fast") {
 							await page.goto(givenUrls[i][j]);
 						} else {
 							await page.goto(givenUrls[i][j], {waitUntil: 'networkidle2'});
 						}
 
-						console.log(page.url());
+						//console.log(page.url());
 
-						if(currentDepth < depth) urls.push(await getUrls());
+						if (currentDepth < depth) urls.push(await getUrls());
 
 						visited.push(page.url());
 
@@ -114,7 +108,7 @@ async function getUrls() {
 
 		const hrefs = await page.$$eval('a', as => as.map(a => a.href));
 
-		result = hrefs.filter(item => item.startsWith(slicedUrl[0] + '//www.' + slicedUrl[2]));
+		let result = hrefs.filter(item => item.startsWith(slicedUrl[0] + '//www.' + slicedUrl[2]));
 
 		result = result.filter(item => item.substr(item.length - 4, 1) !== ".");
 
@@ -127,6 +121,8 @@ async function getUrls() {
 		let uniqueUrls = result.filter(function (elem, index, self) {
 			return index === self.indexOf(elem);
 		});
+
+		console.log('At Url ' + page.url() + ' founded Urls: ' + uniqueUrls.length);
 
 		return uniqueUrls;
 
@@ -142,22 +138,41 @@ async function getCookies() {
 
 	const response = await page._client.send('Network.getAllCookies');
 
-	const currentCookies = response.cookies.map(cookie => {
+	const cookies = response.cookies.map(cookie => {
 		cookie.expiresUTC = new Date(cookie.expires * 1000);
 
-		let timeDiff = Math.abs(new Date(Date.now()).getTime() - new Date(cookie.expires * 1000).getTime());
-		cookie.currentDaysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+		let timeDiff = Math.floor(new Date(Date.now()).getTime() - new Date(cookie.expires * 1000).getTime());
+
+		let days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+		let months = Math.floor(days / 31);
+		let years = Math.floor(months / 12);
+
+		days *= -1;
+		months *= -1;
+		years *= -1;
+
+		let result;
+
+		if (days < 31) {
+			result = days + 'd';
+		} else if (months < 12) {
+			result = months + 'm';
+		} else {
+			result = years + 'y';
+		}
+
+		cookie.currentTimeLeft = result;
+
 
 		return cookie;
 	});
 
-	cookies.push(...currentCookies);
-
-	await writeFile();
+	await writeFile(cookies);
 }
 
 
-async function writeFile() {
+async function writeFile(cookies) {
 
 	if (cookies.length > 0) {
 		let yamlStr = yaml.safeDump(cookies);
