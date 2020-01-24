@@ -13,135 +13,100 @@ let page;
 let currentDepth = 0;
 let slicedUrl = url.split('/');
 let visited = [];
-let urls = [];
 
 
 (async () => {
-
 	if (url != null) {
-
 		if (!isNaN(depth) || depth == null) {
-
 			try {
-
 				browser = await puppeteer.launch();
 				page = await browser.newPage();
 
 				if (depth == null) depth = 0;
 
-				await loopOverUrls([[url]]);
-
+				await loopOverUrls([url]);
 			} catch (error) {
-
 				console.log(error);
-
 			} finally {
-
 				await browser.close();
-
 			}
-
 		} else {
-
 			console.log('No Depth is given');
-
 		}
-
 	} else {
-
 		console.log("No Url is given");
-
 	}
-
 })();
 
 
 async function loopOverUrls(givenUrls) {
+	let newUrls = [];
 
 	if (currentDepth > depth) {
-
 		await getCookies();
-
 	} else if (currentDepth <= depth) {
+		console.log('Visit ' + givenUrls.length + ' Urls at Depth ' + currentDepth);
+		for (let i = 0; i < givenUrls.length; i++) {
+			if (visited.indexOf(givenUrls[i]) === -1) {
+				if (mode === "fast") {
+					await page.goto(givenUrls[i]);
+				} else {
+					await page.goto(givenUrls[i], {waitUntil: 'networkidle2'});
+				}
 
-		console.log('Search for Urls at depth: ' + currentDepth);
+				console.log('('+ (i + 1) + '/' + givenUrls.length + ' ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%) ' + page.url());
 
-		if (givenUrls != null) {
+				visited.push(page.url());
 
-			for (let i = 0; i < givenUrls.length; i++) {
-
-				for (let j = 0; j < givenUrls[i].length; j++) {
-
-					if (visited.indexOf(givenUrls[i][j]) === -1) {
-
-						if (mode === "fast") {
-							await page.goto(givenUrls[i][j]);
-						} else {
-							await page.goto(givenUrls[i][j], {waitUntil: 'networkidle2'});
-						}
-
-						//console.log(page.url());
-
-						if (currentDepth < depth) urls.push(await getUrls());
-
-						visited.push(page.url());
-
-					}
+				if (currentDepth < depth) {
+					newUrls.push(...await getUrls());
+					newUrls = filterUrls(newUrls);
 				}
 			}
 		}
 
 		currentDepth++;
 
-		if (urls != null) {
-
-			await loopOverUrls(urls);
-
+		if (newUrls != null) {
+			await loopOverUrls(newUrls);
 		}
 	}
 }
 
 
 async function getUrls() {
-
 	try {
-
 		const hrefs = await page.$$eval('a', as => as.map(a => a.href));
-
-		let result = hrefs.filter(item => item.startsWith(slicedUrl[0] + '//www.' + slicedUrl[2]));
-
-		result = result.filter(item => item.substr(item.length - 4, 1) !== ".");
-
-		for (let i = 0; i < result.length; i++) {
-			result[i] = result[i].split('#')[0];
-		}
-
-		result = result.filter(item => item != '');
-
-		let uniqueUrls = result.filter(function (elem, index, self) {
-			return index === self.indexOf(elem);
-		});
-
-		console.log('At Url ' + page.url() + ' founded Urls: ' + uniqueUrls.length);
-
-		return uniqueUrls;
-
+		return filterUrls(hrefs);
 	} catch (error) {
-
 		console.log(error);
-
 	}
 }
 
 
+function filterUrls(input) {
+	input = input.filter(item => item.startsWith(slicedUrl[0] + '//www.' + slicedUrl[2]));
+	input = input.filter(item => item.substr(item.length - 4, 1) !== ".");
+	input = input.map(i => {
+		return i.split('#')[0];
+	});
+	input = input.filter(function (elem, index, self) {
+		return index === self.indexOf(elem);
+	});
+	input = input.map(i => {
+		if (visited.indexOf(i) === -1) {
+			return i;
+		}
+	});
+	input = input.filter(item => item != null);
+
+	return input;
+}
+
+
 async function getCookies() {
-
 	const response = await page._client.send('Network.getAllCookies');
-
 	const cookies = response.cookies.map(cookie => {
-		cookie.expiresUTC = new Date(cookie.expires * 1000);
-
-
 		let timeDiff = Math.floor(new Date(Date.now()).getTime() - new Date(cookie.expires * 1000).getTime());
 
 		let days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
@@ -164,6 +129,17 @@ async function getCookies() {
 
 		cookie.currentTimeLeft = result;
 
+		return cookie;
+	});
+
+	await formatCookies(cookies);
+}
+
+async function formatCookies(cookies) {
+	cookies = cookies.map(cookie => {
+		delete cookie.size;
+		delete cookie.value;
+		delete cookie.expires;
 
 		return cookie;
 	});
@@ -173,19 +149,12 @@ async function getCookies() {
 
 
 async function writeFile(cookies) {
-
 	if (cookies.length > 0) {
 		let yamlStr = yaml.safeDump(cookies);
-
 		const filePath = path.join(__dirname, filename + '.yaml');
-
 		await fs.writeFile(filePath, yamlStr, 'utf-8');
-
-		console.log("\nCookies found: " + cookies.length + "\n" + "Yaml file save to: " + filePath);
-
+		console.log("\nCookies found: " + cookies.length + "\n\n" + "Yaml file save to: " + filePath + "\n");
 	} else {
-
-		console.log("no cookies found at the given url");
-
+		console.log("No Cookies found at the given url");
 	}
 }
