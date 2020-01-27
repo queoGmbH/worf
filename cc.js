@@ -11,14 +11,18 @@ let browser;
 let page;
 
 let currentDepth = 0;
-let slicedUrl = url.split('/');
+let startTime;
 let visited = [];
+
+const re = new RegExp(url.split('/')[2]);
 
 
 (async () => {
 	if (url != null) {
 		if (!isNaN(depth) || depth == null) {
 			try {
+				startTime = new Date(Date.now()).getTime();
+
 				browser = await puppeteer.launch();
 				page = await browser.newPage();
 
@@ -42,27 +46,29 @@ let visited = [];
 async function loopOverUrls(givenUrls) {
 	let newUrls = [];
 
-	if (currentDepth > depth) {
-		await getCookies();
-	} else if (currentDepth <= depth) {
-		console.log('Visit ' + givenUrls.length + ' Urls at Depth ' + currentDepth);
-		for (let i = 0; i < givenUrls.length; i++) {
-			if (visited.indexOf(givenUrls[i]) === -1) {
-				if (mode === "fast") {
-					await page.goto(givenUrls[i]);
-				} else {
-					await page.goto(givenUrls[i], {waitUntil: 'networkidle2'});
-				}
+	if (currentDepth <= depth) {
+		if (givenUrls.length > 0) {
+			console.log('\nVisit next ' + givenUrls.length + ' Urls at Depth ' + currentDepth);
+			for (let i = 0; i < givenUrls.length; i++) {
+				if (visited.indexOf(givenUrls[i]) === -1) {
+					if (mode === "fast") {
+						await page.goto(givenUrls[i]);
+					} else {
+						await page.goto(givenUrls[i], {waitUntil: 'networkidle2'});
+					}
 
-				console.log('('+ (i + 1) + '/' + givenUrls.length + ' ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%) ' + page.url());
+					console.log('(' + (i + 1) + '/' + givenUrls.length + ' ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%) ' + page.url());
 
-				visited.push(page.url());
+					visited.push(page.url());
 
-				if (currentDepth < depth) {
-					newUrls.push(...await getUrls());
-					newUrls = filterUrls(newUrls);
+					if (currentDepth < depth) {
+						newUrls.push(...await getUrls());
+						newUrls = filterUrls(newUrls);
+					}
 				}
 			}
+
+			console.log('New Urls found: ' + newUrls.length);
 		}
 
 		currentDepth++;
@@ -70,6 +76,8 @@ async function loopOverUrls(givenUrls) {
 		if (newUrls != null) {
 			await loopOverUrls(newUrls);
 		}
+	} else if (currentDepth > depth) {
+		await getCookies();
 	}
 }
 
@@ -85,7 +93,7 @@ async function getUrls() {
 
 
 function filterUrls(input) {
-	input = input.filter(item => item.startsWith(slicedUrl[0] + '//www.' + slicedUrl[2]));
+	input = input.filter(item => re.test(item));
 	input = input.filter(item => item.substr(item.length - 4, 1) !== ".");
 	input = input.map(i => {
 		return i.split('#')[0];
@@ -107,27 +115,32 @@ function filterUrls(input) {
 async function getCookies() {
 	const response = await page._client.send('Network.getAllCookies');
 	const cookies = response.cookies.map(cookie => {
-		let timeDiff = Math.floor(new Date(Date.now()).getTime() - new Date(cookie.expires * 1000).getTime());
 
-		let days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-		let months = Math.floor(days / 31);
-		let years = Math.floor(months / 12);
+		if (cookie.expires !== -1) {
+			let timeDiff = Math.floor(new Date(Date.now()).getTime() - new Date(cookie.expires * 1000).getTime());
 
-		days *= -1;
-		months *= -1;
-		years *= -1;
+			let days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+			let months = Math.floor(days / 31);
+			let years = Math.floor(months / 12);
 
-		let result;
+			days *= -1;
+			months *= -1;
+			years *= -1;
 
-		if (days < 31) {
-			result = days + 'd';
-		} else if (months < 12) {
-			result = months + 'm';
+			let result;
+
+			if (days < 31) {
+				result = days + 'd';
+			} else if (months < 12) {
+				result = months + 'm';
+			} else {
+				result = years + 'y';
+			}
+
+			cookie.currentTimeLeft = result;
 		} else {
-			result = years + 'y';
+			cookie.currentTimeLeft = 'session';
 		}
-
-		cookie.currentTimeLeft = result;
 
 		return cookie;
 	});
@@ -153,8 +166,30 @@ async function writeFile(cookies) {
 		let yamlStr = yaml.safeDump(cookies);
 		const filePath = path.join(__dirname, filename + '.yaml');
 		await fs.writeFile(filePath, yamlStr, 'utf-8');
-		console.log("\nCookies found: " + cookies.length + "\n\n" + "Yaml file save to: " + filePath + "\n");
+
+		let seconds = (new Date(Date.now()).getTime() - startTime) / 1000;
+		let minutes = seconds / 60;
+		let hours = minutes / 60;
+
+		let timeString = '';
+
+		if (hours > 1) {
+			timeString += hours.toFixed(0) + 'h ';
+			minutes -= Math.floor(hours) * 60;
+		}
+		if (minutes > 1) {
+			timeString += minutes.toFixed(0) + 'min ';
+			seconds -= Math.floor(minutes) * 60;
+		}
+
+		timeString += seconds.toFixed(2) + 'sec ';
+
+
+		console.log('\nVisited Urls:               ' + visited.length);
+		console.log('Total time required:        ' + timeString);
+		console.log('Cookies found:              ' + cookies.length);
+		console.log('Yaml file saved to:         ' + filePath + "\n");
 	} else {
-		console.log("No Cookies found at the given url");
+		console.log('No Cookies found at the given url');
 	}
 }
