@@ -14,8 +14,8 @@ let currentDepth = 0;
 let startTime;
 let visited = [];
 
-const re = new RegExp(url.split('/')[2]);
-
+const regExpDomain = new RegExp(url.split('/')[2]);
+const regExpMail = new RegExp('@');
 
 (async () => {
 	if (url != null) {
@@ -57,7 +57,7 @@ async function loopOverUrls(givenUrls) {
 						await page.goto(givenUrls[i], {waitUntil: 'networkidle2'});
 					}
 
-					console.log('(' + (i + 1) + '/' + givenUrls.length + ' ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%) ' + page.url());
+					console.log((i + 1) + '/' + givenUrls.length + '  -  ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%  -  ' + page.url());
 
 					visited.push(page.url());
 
@@ -68,7 +68,7 @@ async function loopOverUrls(givenUrls) {
 				}
 			}
 
-			console.log('New Urls found: ' + newUrls.length);
+			console.log('Found ' + newUrls.length + ' new Urls');
 		}
 
 		currentDepth++;
@@ -93,8 +93,9 @@ async function getUrls() {
 
 
 function filterUrls(input) {
-	input = input.filter(item => re.test(item));
+	input = input.filter(item => regExpDomain.test(item));
 	input = input.filter(item => item.substr(item.length - 4, 1) !== ".");
+	input = input.filter(item => !regExpMail.test(item));
 	input = input.map(i => {
 		return i.split('#')[0];
 	});
