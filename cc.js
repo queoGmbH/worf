@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
 const path = require('path');
 const yaml = require('js-yaml');
-const filename = "data-out";
+const filename = "cookies";
 const url = process.argv[2];
 let depth = process.argv[3];
 const mode = process.argv[4];
@@ -57,7 +57,12 @@ async function loopOverUrls(givenUrls) {
 						await page.goto(givenUrls[i], {waitUntil: 'networkidle2'});
 					}
 
-					console.log((i + 1) + '/' + givenUrls.length + '  -  ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%  -  ' + page.url());
+					let p = page.url();
+					if(p.length > 100) {
+						p = p.slice(0, 100) + '...';
+					}
+
+					console.log((i + 1) + '/' + givenUrls.length + '  -  ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%  -  ' + p);
 
 					visited.push(page.url());
 
@@ -138,22 +143,13 @@ async function getCookies() {
 				result = years + 'y';
 			}
 
-			cookie.currentTimeLeft = result;
+			cookie.expires = result;
+
+			delete cookie.size;
+			delete cookie.value;
 		} else {
-			cookie.currentTimeLeft = 'session';
+			cookie.expires = 'session';
 		}
-
-		return cookie;
-	});
-
-	await formatCookies(cookies);
-}
-
-async function formatCookies(cookies) {
-	cookies = cookies.map(cookie => {
-		delete cookie.size;
-		delete cookie.value;
-		delete cookie.expires;
 
 		return cookie;
 	});
@@ -168,29 +164,38 @@ async function writeFile(cookies) {
 		const filePath = path.join(__dirname, filename + '.yaml');
 		await fs.writeFile(filePath, yamlStr, 'utf-8');
 
-		let seconds = (new Date(Date.now()).getTime() - startTime) / 1000;
-		let minutes = seconds / 60;
-		let hours = minutes / 60;
-
-		let timeString = '';
-
-		if (hours > 1) {
-			timeString += hours.toFixed(0) + 'h ';
-			minutes -= Math.floor(hours) * 60;
-		}
-		if (minutes > 1) {
-			timeString += minutes.toFixed(0) + 'min ';
-			seconds -= Math.floor(minutes) * 60;
-		}
-
-		timeString += seconds.toFixed(2) + 'sec ';
-
-
 		console.log('\nVisited Urls:               ' + visited.length);
-		console.log('Total time required:        ' + timeString);
+		console.log('Total time required:        ' + timeStringConstructor());
 		console.log('Cookies found:              ' + cookies.length);
 		console.log('Yaml file saved to:         ' + filePath + "\n");
 	} else {
 		console.log('No Cookies found at the given url');
 	}
+}
+
+
+function timeStringConstructor() {
+	let seconds = (new Date(Date.now()).getTime() - startTime) / 1000;
+	let minutes = 0;
+	let hours = 0;
+
+	while(seconds > 59) {
+		seconds -= 60;
+		minutes += 1;
+
+		if(minutes > 59) {
+			minutes -= 60;
+			hours += 1;
+		}
+	}
+
+
+	let timeString = '';
+
+	if(hours > 0) timeString += hours + 'h ';
+	if(minutes > 0) timeString += minutes + 'min ';
+
+	timeString += seconds.toFixed(2) + 'sec ';
+
+	return timeString;
 }
