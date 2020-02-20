@@ -48,7 +48,7 @@ async function loopOverUrls(givenUrls) {
 
 	if (currentDepth <= depth) {
 		if (givenUrls.length > 0) {
-			console.log('\nVisit next ' + givenUrls.length + ' Urls at Depth ' + currentDepth);
+			console.log('\nVisit ' + givenUrls.length + ' Urls at Depth ' + currentDepth);
 			for (let i = 0; i < givenUrls.length; i++) {
 				if (visited.indexOf(givenUrls[i]) === -1) {
 					if (mode === "fast") {
@@ -160,7 +160,8 @@ async function getCookies() {
 
 async function writeFile(cookies) {
 	if (cookies.length > 0) {
-		let yamlStr = yaml.safeDump(cookies);
+		cookies = formatCookies(cookies);
+		let yamlStr = yaml.safeDump(await yamlStringConstructor(cookies));
 		const filePath = path.join(__dirname, filename + '.yaml');
 		await fs.writeFile(filePath, yamlStr, 'utf-8');
 
@@ -171,6 +172,29 @@ async function writeFile(cookies) {
 	} else {
 		console.log('No Cookies found at the given url');
 	}
+}
+
+function formatCookies(cookies) {
+	let obj = {};
+
+	for (let i = 0; i < cookies.length; i++) {
+		let name = cookies[i].name;
+		delete cookies[i].name;
+		obj[name] = cookies[i];
+	}
+
+	return obj;
+}
+
+async function yamlStringConstructor(cookies) {
+	let string = await readFile();
+	string.cookie_registry.cookies = cookies;
+	return string;
+}
+
+async function readFile() {
+	let fileContents = await fs.readFile('./data.yaml', 'utf8');
+	return yaml.safeLoad(fileContents);
 }
 
 
