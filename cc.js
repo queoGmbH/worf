@@ -3,15 +3,43 @@ const fs = require('fs').promises;
 const path = require('path');
 const yaml = require('js-yaml');
 
+const rl = require('readline').createInterface({
+	input: process.stdin,
+	output: process.stdout
+});
+
 const filename = 'cookies';
 
-
-let url = 'https://ujamii.com';
-let inputFilePath = '';
-let outputPath = '';
-let depth = '1';
-let mode = 'fast';
-
+let data = {
+	url: {
+		value: '',
+		validator: '^(https?:\/\/)(www\.)?[a-zA-Z0-9#=@:%._\+-]{1,256}(\.[a-zA-Z0-9]{1,6}\/?)([a-zA-Z0-9#=@:%._\+-\/]*)$',
+		required: true
+	},
+	inputFile: {
+		value: '',
+		validator: '^.{1,}\..{2,}$',
+		required: false,
+	},
+	outputPath: {
+		value: '',
+		validator: '^.*[\/]*.\/$', 	// [a-zA-Z0-9+/#.]*$
+		required: false,
+		default: './'
+	},
+	depth: {
+		value: '',
+		validator: '^[0-9]*$',
+		required: false,
+		default: '0'
+	},
+	mode: {
+		value: '',
+		validator: '^(deep|fast)$',
+		required: false,
+		default: 'deep'
+	}
+};
 
 // PUPPETEER
 let browser;
@@ -21,25 +49,94 @@ let page;
 let currentDepth = 0;
 let startTime;
 let visited = [];
+let missingProperties = [];
 
 // REGULAR EXPRESSIONS
-const regExpDomain = new RegExp(url.split('/')[2]);
+let regularExpressionInput = new RegExp('^-[a-z]$');
+const regExpDomain = new RegExp(data.url.value.split('/')[2]);
 const regExpMail = new RegExp('@');
 
 (async () => {
-	await startProcess();
+
+	sortInput(process.argv);
+
+	//await startProcess();
 })();
 
+function sortInput(input) {
+	for (let i = 0; i < input.length; i++) {
+		for (let property in data) {
+			if (data.hasOwnProperty(property)) {
+				if (regularExpressionInput.test(input[i]) && input[i].length === 2) {
+					if (input[i] === '-' + property.slice(0, 1)) {
+						data[property].value = input[i + 1];
+					}
+				}
+			}
+		}
+	}
+
+	for (let property in data) {
+		if(data.hasOwnProperty(property)) {
+			if (data[property].value.length < 1) {
+				missingProperties.push(property);
+			}
+		}
+	}
+
+	if(missingProperties.length > 0) {
+		(function getMissingProperty() {
+			const missingProperty = missingProperties.shift();
+			if(data[missingProperty].required === true) {
+				rl.question(missingProperty + ': ', (answer) => {
+					if (validateData(missingProperty, answer)) {
+						data[missingProperty].value = answer;
+					} else {
+						console.log('\nInvalid argument\n');
+						missingProperties.push(missingProperty);
+					}
+					if (missingProperties.length > 0) {
+						getMissingProperty();
+					} else {
+						displayInput(data.url.value, data.inputFile.value, data.outputPath.value, data.depth.value, data.mode.value);
+						rl.close()
+					}
+				});
+			} else {
+				if(data[missingProperty.hasOwnProperty('default')])data[missingProperty].value = data[missingProperty].default;
+			}
+		})();
+	} else {
+		displayInput(data.url.value, data.inputFile.value, data.outputPath.value, data.depth.value, data.mode.value);
+	}
+}
+
+function validateData(property, answer) {
+	if(answer.length > 0) return new RegExp(data[property].validator).test(answer);
+}
+
+
+function displayInput(url, inputFile, outputPath, depth, mode) {
+	rl.close();
+	console.log('\nurl:          ' + url);
+	console.log('inputFile:    ' + inputFile);
+	console.log('outputPath:   ' + outputPath);
+	console.log('depth:        ' + depth);
+	console.log('mode:         ' + mode + '\n');
+
+	startProcess();
+}
+
 async function startProcess() {
-	if (url != null) {
-		if (!isNaN(depth)) {
+	if (data.url.value != null) {
+		if (!isNaN(data.depth.value)) {
 			try {
 				startTime = new Date(Date.now()).getTime();
 
 				browser = await puppeteer.launch();
 				page = await browser.newPage();
 
-				await loopOverUrls([url]);
+				await loopOverUrls([data.url.value]);
 			} catch (error) {
 				console.log(error);
 			} finally {
@@ -56,12 +153,13 @@ async function startProcess() {
 async function loopOverUrls(givenUrls) {
 	let newUrls = [];
 
-	if (currentDepth <= depth) {
+	if (currentDepth <= data.depth.value) {
 		if (givenUrls.length > 0) {
 			console.log('\nVisit ' + givenUrls.length + ' Urls at Depth ' + currentDepth);
 			for (let i = 0; i < givenUrls.length; i++) {
 				if (visited.indexOf(givenUrls[i]) === -1) {
-					if (mode === 'fast') {
+					console.log(givenUrls[i]);
+					if (data.mode.value === 'fast') {
 						await page.goto(givenUrls[i]);
 					} else {
 						await page.goto(givenUrls[i], {waitUntil: 'networkidle2'});
@@ -76,7 +174,7 @@ async function loopOverUrls(givenUrls) {
 
 					visited.push(page.url());
 
-					if (currentDepth < depth) {
+					if (currentDepth < data.depth.value) {
 						newUrls.push(...await getUrls());
 						newUrls = filterUrls(newUrls);
 					}
@@ -88,10 +186,10 @@ async function loopOverUrls(givenUrls) {
 
 		currentDepth++;
 
-		if (newUrls != null) {
+		if (newUrls.length) {
 			await loopOverUrls(newUrls);
 		}
-	} else if (currentDepth > depth) {
+	} else if (currentDepth > data.depth.value) {
 		await getCookies();
 	}
 }
@@ -166,15 +264,18 @@ async function getCookies() {
 
 async function writeFile(cookies) {
 	if (cookies.length > 0) {
+		let foundedCookies = cookies.length;
 		cookies = formatCookies(cookies);
 		let yamlStr = yaml.safeDump(await yamlStringConstructor(cookies));
-		const filePath = path.join(__dirname, filename + '.yaml');
+		const filePath = path.join(data.outputPath.value, filename + '.yaml');
 		await fs.writeFile(filePath, yamlStr, 'utf-8');
 
 		console.log('\nVisited Urls:               ' + visited.length);
 		console.log('Total time required:        ' + timeStringConstructor());
-		console.log('Cookies found:              ' + cookies.length);
+		console.log('Cookies found:              ' + foundedCookies);
 		console.log('Yaml file saved to:         ' + filePath + '\n');
+
+		rl.close();
 	} else {
 		console.log('No Cookies found at the given url');
 	}
@@ -193,13 +294,17 @@ function formatCookies(cookies) {
 }
 
 async function yamlStringConstructor(cookies) {
-	let string = await readFile();
-	string.cookie_registry.cookies = cookies;
-	return string;
+	if(data.inputFile.value != null) {
+		let string = await readFile();
+		string.cookie_registry.cookies = cookies;
+		return string;
+	} else {
+		return cookies;
+	}
 }
 
 async function readFile() {
-	let fileContents = await fs.readFile('./data.yaml', 'utf8');
+	let fileContents = await fs.readFile(data.inputFile.value, 'utf8');
 	return yaml.safeLoad(fileContents);
 }
 
