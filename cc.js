@@ -2,31 +2,42 @@ const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
 const path = require('path');
 const yaml = require('js-yaml');
-const filename = "cookies";
-const url = process.argv[2];
-let depth = process.argv[3];
-const mode = process.argv[4];
 
+const filename = 'cookies';
+
+
+let url = 'https://ujamii.com';
+let inputFilePath = '';
+let outputPath = '';
+let depth = '1';
+let mode = 'fast';
+
+
+// PUPPETEER
 let browser;
 let page;
 
+// TEMPORARY VARIABLES
 let currentDepth = 0;
 let startTime;
 let visited = [];
 
+// REGULAR EXPRESSIONS
 const regExpDomain = new RegExp(url.split('/')[2]);
 const regExpMail = new RegExp('@');
 
 (async () => {
+	await startProcess();
+})();
+
+async function startProcess() {
 	if (url != null) {
-		if (!isNaN(depth) || depth == null) {
+		if (!isNaN(depth)) {
 			try {
 				startTime = new Date(Date.now()).getTime();
 
 				browser = await puppeteer.launch();
 				page = await browser.newPage();
-
-				if (depth == null) depth = 0;
 
 				await loopOverUrls([url]);
 			} catch (error) {
@@ -38,10 +49,9 @@ const regExpMail = new RegExp('@');
 			console.log('No Depth is given');
 		}
 	} else {
-		console.log("No Url is given");
+		console.log('No Url is given');
 	}
-})();
-
+}
 
 async function loopOverUrls(givenUrls) {
 	let newUrls = [];
@@ -51,14 +61,14 @@ async function loopOverUrls(givenUrls) {
 			console.log('\nVisit ' + givenUrls.length + ' Urls at Depth ' + currentDepth);
 			for (let i = 0; i < givenUrls.length; i++) {
 				if (visited.indexOf(givenUrls[i]) === -1) {
-					if (mode === "fast") {
+					if (mode === 'fast') {
 						await page.goto(givenUrls[i]);
 					} else {
 						await page.goto(givenUrls[i], {waitUntil: 'networkidle2'});
 					}
 
 					let p = page.url();
-					if(p.length > 100) {
+					if (p.length > 100) {
 						p = p.slice(0, 100) + '...';
 					}
 
@@ -86,7 +96,6 @@ async function loopOverUrls(givenUrls) {
 	}
 }
 
-
 async function getUrls() {
 	try {
 		const hrefs = await page.$$eval('a', as => as.map(a => a.href));
@@ -96,10 +105,9 @@ async function getUrls() {
 	}
 }
 
-
 function filterUrls(input) {
 	input = input.filter(item => regExpDomain.test(item));
-	input = input.filter(item => item.substr(item.length - 4, 1) !== ".");
+	input = input.filter(item => item.substr(item.length - 4, 1) !== '.');
 	input = input.filter(item => !regExpMail.test(item));
 	input = input.map(i => {
 		return i.split('#')[0];
@@ -116,7 +124,6 @@ function filterUrls(input) {
 
 	return input;
 }
-
 
 async function getCookies() {
 	const response = await page._client.send('Network.getAllCookies');
@@ -157,7 +164,6 @@ async function getCookies() {
 	await writeFile(cookies);
 }
 
-
 async function writeFile(cookies) {
 	if (cookies.length > 0) {
 		cookies = formatCookies(cookies);
@@ -168,7 +174,7 @@ async function writeFile(cookies) {
 		console.log('\nVisited Urls:               ' + visited.length);
 		console.log('Total time required:        ' + timeStringConstructor());
 		console.log('Cookies found:              ' + cookies.length);
-		console.log('Yaml file saved to:         ' + filePath + "\n");
+		console.log('Yaml file saved to:         ' + filePath + '\n');
 	} else {
 		console.log('No Cookies found at the given url');
 	}
@@ -197,17 +203,16 @@ async function readFile() {
 	return yaml.safeLoad(fileContents);
 }
 
-
 function timeStringConstructor() {
 	let seconds = (new Date(Date.now()).getTime() - startTime) / 1000;
 	let minutes = 0;
 	let hours = 0;
 
-	while(seconds > 59) {
+	while (seconds > 59) {
 		seconds -= 60;
 		minutes += 1;
 
-		if(minutes > 59) {
+		if (minutes > 59) {
 			minutes -= 60;
 			hours += 1;
 		}
@@ -216,8 +221,8 @@ function timeStringConstructor() {
 
 	let timeString = '';
 
-	if(hours > 0) timeString += hours + 'h ';
-	if(minutes > 0) timeString += minutes + 'min ';
+	if (hours > 0) timeString += hours + 'h ';
+	if (minutes > 0) timeString += minutes + 'min ';
 
 	timeString += seconds.toFixed(2) + 'sec ';
 
