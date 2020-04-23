@@ -136,12 +136,12 @@ async function loopOverUrls(givenUrls) {
 						await page.goto(givenUrls[i], {waitUntil: 'networkidle2'});
 					}
 
-					let p = page.url();
-					if (p.length > 100) {
-						p = p.slice(0, 100) + '...';
+					let pageUrl = page.url();
+					if (pageUrl.length > 100) {
+						pageUrl = pageUrl.slice(0, 100) + '...';
 					}
 
-					console.log((i + 1) + '/' + givenUrls.length + '  -  ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%  -  ' + p);
+					console.log((i + 1) + '/' + givenUrls.length + '  -  ' + (((i + 1) / givenUrls.length) * 100).toFixed(2) + '%  -  ' + pageUrl);
 
 					visited.push(page.url());
 
@@ -160,7 +160,6 @@ async function loopOverUrls(givenUrls) {
 		}
 
 		currentDepth++;
-
 
 		await loopOverUrls(newUrls);
 
@@ -182,7 +181,6 @@ async function getUrls() {
 function filterUrls(input) {
 	input = input.filter(item => regExpDomain.test(item));
 	input = input.filter(item => item.substr(item.length - 4, 1) !== ".");
-	input = input.filter(item => !regExpMail.test(item));
 	input = input.map(i => {
 		return i.split('#')[0];
 	});
